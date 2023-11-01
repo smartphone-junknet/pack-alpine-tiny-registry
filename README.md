@@ -6,4 +6,4 @@ Moreover, the job templates are rendered with a smaller default allocation files
 
 ## PostmarketOS
 
-This registry is tested mainly on PostmarketOS physical and virtual hosts.
+This registry is tested mainly on PostmarketOS physical and virtual hosts. The target host is tested after provisioning with the Ansible playbook found at [this repository](https://github.com/smartphone-junknet/junknode-provisioner)
