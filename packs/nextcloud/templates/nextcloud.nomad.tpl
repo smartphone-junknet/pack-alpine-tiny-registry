@@ -48,7 +48,9 @@ job [[ template "job_name" . ]] {
       }
       template {
         destination = "local/nginx.conf"
-        data        = file("./_nginix.conf")
+        data        = <<EOH
+[[ template "nginix_conf" . ]]
+EOH
       }
       [[ template "resources" .nextcloud.web_resources ]]
     }

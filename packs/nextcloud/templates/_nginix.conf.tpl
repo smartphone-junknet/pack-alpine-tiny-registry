@@ -1,3 +1,6 @@
+// full Nginx config file template
+
+[[ define "nginix_conf" -]]
 worker_processes auto;
 
 error_log  /var/log/nginx/error.log warn;
@@ -142,3 +145,4 @@ http {
         }
     }
 }
+[[- end ]]
