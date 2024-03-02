@@ -11,29 +11,35 @@ events {
 }
 
 http {
-    include      /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
     log_format main '$remote_addr | $remote_user [$time_local] "$request" '
                     'code $status sent $body_bytes_sent B "$http_referer" | '
                     '"$http_user_agent" "$http_x_forwarded_for"';
 
     access_log  /var/log/nginx/access.log  main;
 
-    sendfile          on;
-    keepalive_timeout 65;
-    server_tokens     off;
-
     upstream php-handler {
         server localhost:9000;
+    }
+
+    # Set the `immutable` cache control options only for assets with a cache busting `v` argument
+    map $arg_v $asset_immutable {
+        "" "";
+        default "immutable";
     }
 
     server {
         listen 80;
         http2 on;
 
-        # set max upload size
+        # Path to the root of your installation
+        root /var/www/html;
+
+        # Prevent nginx HTTP Server Detection
+        server_tokens off;
+
+        # set max upload size and increase upload timeout:
         client_max_body_size 512M;
+        client_body_timeout 300s;
         fastcgi_buffers 64 4K;
 
         # Enable gzip but do not remove ETag headers
@@ -42,23 +48,29 @@ http {
         gzip_comp_level 4;
         gzip_min_length 256;
         gzip_proxied expired no-cache no-store private no_last_modified no_etag auth;
-        gzip_types application/atom+xml application/javascript application/json application/ld+json application/manifest+json application/rss+xml application/vnd.geo+json application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/bmp image/svg+xml image/x-icon text/cache-manifest text/css text/plain text/vcard text/vnd.rim.location.xloc text/vtt text/x-component text/x-cross-domain-policy;
+        gzip_types application/atom+xml text/javascript application/javascript application/json application/ld+json application/manifest+json application/rss+xml application/vnd.geo+json application/vnd.ms-fontobject application/wasm application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/bmp image/svg+xml image/x-icon text/cache-manifest text/css text/plain text/vcard text/vnd.rim.location.xloc text/vtt text/x-component text/x-cross-domain-policy;
+
+        # The settings allows you to optimize the HTTP2 bandwidth.
+        client_body_buffer_size 512k;
 
         # HTTP response headers borrowed from Nextcloud `.htaccess`
-        add_header Referrer-Policy                      "no-referrer"       always;
-        add_header X-Content-Type-Options               "nosniff"           always;
-        add_header X-Download-Options                   "noopen"            always;
-        add_header X-Frame-Options                      "SAMEORIGIN"        always;
-        add_header X-Permitted-Cross-Domain-Policies    "none"              always;
-        add_header X-Robots-Tag                         "noindex, nofollow" always;
-        add_header X-XSS-Protection                     "1; mode=block"     always;
+        add_header Referrer-Policy                   "no-referrer"       always;
+        add_header X-Content-Type-Options            "nosniff"           always;
+        add_header X-Frame-Options                   "SAMEORIGIN"        always;
+        add_header X-Permitted-Cross-Domain-Policies "none"              always;
+        add_header X-Robots-Tag                      "noindex, nofollow" always;
+        add_header X-XSS-Protection                  "1; mode=block"     always;
 
         # Remove X-Powered-By, which is an information leak
         fastcgi_hide_header X-Powered-By;
 
-        # Path to the root of your installation
-        root /var/www/html;
+        # Add .mjs as a file extension for javascript
+        include mime.types;
+        types {
+            text/javascript js mjs;
+        }
 
+        # Specify how to handle directories
         index index.php index.html /index.php$request_uri;
 
         # Rule borrowed from `.htaccess` to handle Microsoft DAV clients
@@ -74,22 +86,14 @@ http {
             access_log off;
         }
 
-        # Make a regex exception for `/.well-known` so that clients can still
-        # access it despite the existence of the regex rule
-        # `location ~ /(\.|autotest|...)` which would otherwise handle requests
-        # for `/.well-known`.
+        # Make a regex exception for `/.well-known`
         location ^~ /.well-known {
-            # The rules in this block are an adaptation of the rules
-            # in `.htaccess` that concern `/.well-known`.
-
             location = /.well-known/carddav { return 301 /remote.php/dav/; }
             location = /.well-known/caldav  { return 301 /remote.php/dav/; }
 
             location /.well-known/acme-challenge    { try_files $uri $uri/ =404; }
             location /.well-known/pki-validation    { try_files $uri $uri/ =404; }
 
-            # Let Nextcloud's API for `/.well-known` URIs handle all other
-            # requests by passing them to the front-end controller.
             return 301 /index.php$request_uri;
         }
 
@@ -98,12 +102,10 @@ http {
         location ~ ^/(?:\.|autotest|occ|issue|indie|db_|console)                { return 404; }
 
         # Ensure this block, which passes PHP files to the PHP process, is above the blocks
-        # which handle static assets (as seen below). If this block is not declared first,
-        # then Nginx will encounter an infinite rewriting loop when it prepends `/index.php`
-        # to the URI, resulting in a HTTP 500 error response.
+        # which handle static assets (as seen below).
         location ~ \.php(?:$|/) {
             # Required for legacy support
-            rewrite ^/(?!index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|oc[ms]-provider\/.+|.+\/richdocumentscode\/proxy) /index.php$request_uri;
+            rewrite ^/(?!index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|ocs-provider\/.+|.+\/richdocumentscode\/proxy) /index.php$request_uri;
 
             fastcgi_split_path_info ^(.+?\.php)(/.*)$;
             set $path_info $fastcgi_path_info;
@@ -113,7 +115,7 @@ http {
             include fastcgi_params;
             fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
             fastcgi_param PATH_INFO $path_info;
-            #fastcgi_param HTTPS on;
+            fastcgi_param HTTPS on;
 
             fastcgi_param modHeadersAvailable true;         # Avoid sending the security headers twice
             fastcgi_param front_controller_active true;     # Enable pretty urls
@@ -121,12 +123,19 @@ http {
 
             fastcgi_intercept_errors on;
             fastcgi_request_buffering off;
+
+            fastcgi_max_temp_file_size 0;
         }
 
-        location ~ \.(?:css|js|svg|gif)$ {
+        # Serve static files
+        location ~ \.(?:css|js|mjs|svg|gif|png|jpg|ico|wasm|tflite|map|ogg|flac)$ {
             try_files $uri /index.php$request_uri;
-            expires 6M;         # Cache-Control policy borrowed from `.htaccess`
+            add_header Cache-Control "public, max-age=15778463, $asset_immutable";
             access_log off;     # Optional: Don't log access to assets
+
+            location ~ \.wasm$ {
+                default_type application/wasm;
+            }
         }
 
         location ~ \.woff2?$ {
