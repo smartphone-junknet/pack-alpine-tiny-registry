@@ -37,19 +37,19 @@ variable "pause_image_tag" {
 variable "nginx_image_tag" {
   description = "Nginx proxy container image tag string; for options, see https://hub.docker.com/_/nginx"
   type        = string
-  default     = "1.25.4-alpine"
+  default     = "1.27.2-alpine"
 }
 
 variable "nextcloud_image_tag" {
   description = "NextCloud Server container image tag string; for options, see https://hub.docker.com/_/nextcloud"
   type        = string
-  default     = "28.0.2-fpm-alpine"
+  default     = "29.0.8-fpm-alpine"
 }
 
 variable "postgres_image_tag" {
   description = "PostgreSQL container image tag string; for options, see https://hub.docker.com/_/postgres"
   type        = string
-  default     = "15.6-alpine"
+  default     = "16.4-alpine"
 }
 
 variable "constraints" {

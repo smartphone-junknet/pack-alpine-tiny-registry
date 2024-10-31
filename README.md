@@ -4,6 +4,15 @@ This registry contains curated Packs to be run on Alpine Linux clients, defaulti
 
 Moreover, the job templates are rendered with a smaller default allocation filesystem and resource quotas, accounting for small hosts capacity.
 
+## Required packages
+
+The following packages are required for deploying packs in Nomad:
+
+- `git` is needed to download the registry information through the `nomad-pack` command
+- `slirp4netns` is required to run the packs in a rootless context
+
+Moreover, it is mandatory to check the pack variables' defaults and override them if they do not match your installation: for example, the `job_name` and `datacenters` variables probably should be customized.
+
 ## PostmarketOS
 
 This registry is tested mainly on PostmarketOS physical and virtual hosts. The target host is tested after provisioning with the Ansible playbook found at [this repository](https://github.com/smartphone-junknet/junknode-provisioner)
